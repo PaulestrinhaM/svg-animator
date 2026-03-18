@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>SVG Animator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: monospace; font-size: 12px; background: #f5f5f5; color: #222; height: 100vh; overflow: hidden; }
+
+#wrap {
+  display: grid;
+  grid-template-columns: 210px 1fr 265px;
+  grid-template-rows: 42px 1fr;
+  height: 100vh;
+}
+
+#toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-bottom: 1px solid #ddd;
+  background: #fff;
+}
+#toolbar-title { font-size: 10px; letter-spacing: .12em; color: #999; text-transform: uppercase; margin-right: 4px; }
+
+#left {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #ddd;
+  background: #fff;
+  overflow: hidden;
+}
+#svg-input {
+  flex: 0 0 150px;
+  font-family: monospace;
+  font-size: 10px;
+  padding: 8px;
+  border: none;
+  outline: none;
+  resize: none;
+  background: #f9f9f9;
+  color: #555;
+  border-bottom: 1px solid #ddd;
+  width: 100%;
+}
+#el-list { flex: 1; overflow-y: auto; }
+.eli {
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #555;
+  font-size: 11px;
+  user-select: none;
+}
+.eli:hover { background: #f5f5f5; }
+.eli.active { background: #e8f0fe; color: #1a56db; }
+.etag {
+  font-size: 9px; padding: 1px 4px; border-radius: 3px;
+  background: #eee; color: #888; border: 1px solid #ddd; flex-shrink: 0;
+}
+.eli.active .etag { background: transparent; border-color: currentColor; }
+.ename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#center {
+  background: #e8e8e8;
+  background-image: linear-gradient(45deg,#d8d8d8 25%,transparent 25%),linear-gradient(-45deg,#d8d8d8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d8d8d8 75%),linear-gradient(-45deg,transparent 75%,#d8d8d8 75%);
+  background-size: 16px 16px;
+  background-position: 0 0,0 8px,8px -8px,-8px 0px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 20px;
+  position: relative;
+}
+#preview-container {
+  max-width: 100%;
+  max-height: 100%;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.15);
+  line-height: 0;
+  position: relative;
+}
+#preview-container svg {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 82px);
+  width: auto;
+  height: auto;
+}
+#empty-msg {
+  padding: 40px 24px;
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.6;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.1);
+}
+
+#right {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #ddd;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.sh {
+  padding: 5px 10px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #999;
+  border-bottom: 1px solid #ddd;
+  background: #fff;
+  flex-shrink: 0;
+}
+.fg { padding: 7px 10px; border-bottom: 1px solid #eee; }
+.fl { display: block; font-size: 9px; color: #999; margin-bottom: 3px; text-transform: uppercase; }
+.fr { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+
+input[type=number], select, textarea {
+  width: 100%; font-family: monospace; font-size: 11px;
+  border: 1px solid #ddd; padding: 3px 5px; border-radius: 3px; background: #fafafa;
+}
+textarea.mp { height: 52px; resize: none; padding: 4px; }
+
+button {
+  padding: 4px 10px; font-family: monospace; font-size: 11px;
+  cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #fff; white-space: nowrap;
+}
+button:hover { background: #f0f0f0; }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: #1a56db; color: #fff; border-color: #1a56db; }
+button.primary:hover { background: #1447c0; }
+button.primary:disabled { background: #1a56db; opacity: .4; }
+
+#anim-list { padding: 8px; }
+.ai {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 8px; border: 1px solid #eee; border-radius: 4px; margin-bottom: 5px; font-size: 11px;
+}
+.ai-info { color: #aaa; font-size: 10px; }
+.db { background: none; border: none; cursor: pointer; color: #cc0022; font-size: 18px; padding: 0 2px; line-height: 1; }
+
+.tpanel { display: none; }
+.empty-hint { padding: 12px 10px; font-size: 11px; color: #bbb; text-align: center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+
+  <div id="toolbar">
+    <span id="toolbar-title">SVG Animator</span>
+    <button id="import-btn">Importar SVG</button>
+    <input type="file" id="file-input" accept=".svg,image/svg+xml" style="display:none">
+    <button id="parse-btn">Parse SVG</button>
+    <button id="add-btn" class="primary" disabled>+ Adicionar</button>
+    <button id="exp-btn" style="margin-left:auto">Exportar SVG</button>
+  </div>
+
+  <div id="left">
+    <div class="sh">Código SVG</div>
+    <textarea id="svg-input" placeholder="Cole seu SVG aqui ou use Importar SVG..."></textarea>
+    <div class="sh">Elementos</div>
+    <div id="el-list"><div class="empty-hint">Importe um SVG e clique em Parse SVG</div></div>
+  </div>
+
+  <div id="center">
+    <div id="preview-container">
+      <div id="empty-msg">Preview aparece aqui após o parse</div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="sh">Configurar animação</div>
+    <div class="fg">
+      <span class="fl">Elemento selecionado</span>
+      <div id="sel-label" style="color:#aaa;font-size:11px">nenhum</div>
+    </div>
+    <div class="fg">
+      <span class="fl">Tipo de animação</span>
+      <select id="anim-type">
+        <option value="translate">Translate — mover</option>
+        <option value="rotate">Rotate — girar</option>
+        <option value="fade">Fade — opacidade</option>
+        <option value="scale">Scale — escala</option>
+        <option value="morph">Morph — forma (path)</option>
+      </select>
+    </div>
+
+    <div id="tp-translate" class="tpanel">
+      <div class="fg"><span class="fl">De (x, y)</span><div class="fr"><input type="number" id="tx-fx" value="0"><input type="number" id="tx-fy" value="0"></div></div>
+      <div class="fg"><span class="fl">Para (x, y)</span><div class="fr"><input type="number" id="tx-tx" value="20"><input type="number" id="tx-ty" value="0"></div></div>
+    </div>
+    <div id="tp-rotate" class="tpanel">
+      <div class="fg"><span class="fl">De → Para (graus)</span><div class="fr"><input type="number" id="rot-f" value="0"><input type="number" id="rot-t" value="360"></div></div>
+    </div>
+    <div id="tp-fade" class="tpanel">
+      <div class="fg"><span class="fl">Opacidade de → para</span><div class="fr"><input type="number" id="fd-f" value="1" min="0" max="1" step="0.1"><input type="number" id="fd-t" value="0" min="0" max="1" step="0.1"></div></div>
+    </div>
+    <div id="tp-scale" class="tpanel">
+      <div class="fg"><span class="fl">Escala de → para</span><div class="fr"><input type="number" id="sc-f" value="1" step="0.05"><input type="number" id="sc-t" value="1.2" step="0.05"></div></div>
+    </div>
+    <div id="tp-morph" class="tpanel">
+      <div class="fg"><span class="fl">Path de (d)</span><textarea class="mp" id="m-from" placeholder="M0 0 L100 0..."></textarea></div>
+      <div class="fg"><span class="fl">Path para (d)</span><textarea class="mp" id="m-to" placeholder="M10 10 L90 10..."></textarea></div>
+    </div>
+
+    <div class="fg"><span class="fl">Duração (s) / Delay (s)</span><div class="fr"><input type="number" id="a-dur" value="1" min="0.1" step="0.1"><input type="number" id="a-del" value="0" min="0" step="0.1"></div></div>
+    <div class="fg"><span class="fl">Repetição</span><select id="a-rep"><option value="infinite">infinita</option><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option></select></div>
+    <div class="fg"><span class="fl">Direção</span><select id="a-dir"><option value="normal">normal</option><option value="alternate">alternate</option><option value="reverse">reverse</option><option value="alternate-reverse">alternate-reverse</option></select></div>
+    <div class="fg"><span class="fl">Easing</span><select id="a-eas"><option value="ease">ease</option><option value="ease-in-out">ease-in-out</option><option value="ease-in">ease-in</option><option value="ease-out">ease-out</option><option value="linear">linear</option></select></div>
+
+    <div class="sh">Animações aplicadas</div>
+    <div id="anim-list"><div class="empty-hint">Nenhuma ainda</div></div>
+  </div>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let rawSVG='', svgDoc=null, elements=[], selId=null, anims=[], ac=0;
+
+$('import-btn').addEventListener('click', () => $('file-input').click());
+$('file-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { $('svg-input').value = e.target.result; parseSVG(); };
+  reader.readAsText(file);
+  this.value = '';
+});
+$('parse-btn').addEventListener('click', parseSVG);
+
+function parseSVG() {
+  rawSVG = $('svg-input').value.trim();
+  if (!rawSVG) return;
+  const parser = new DOMParser();
+  svgDoc = parser.parseFromString(rawSVG, 'image/svg+xml');
+  if (svgDoc.querySelector('parsererror')) { alert('SVG inválido'); return; }
+
+  elements = []; anims = []; selId = null; ac = 0;
+  $('sel-label').textContent = 'nenhum';
+  $('sel-label').style.color = '#aaa';
+  $('add-btn').disabled = true;
+  renderAnimList();
+
+  let c = 0;
+  svgDoc.documentElement.querySelectorAll('path,rect,circle,ellipse,line,polyline,polygon,text,g,use,image').forEach(el => {
+    if (!el.id) el.id = 'ae-' + c++;
+    elements.push({ id: el.id, tag: el.tagName.toLowerCase() });
+  });
+
+  renderElList();
+  renderPreview();
+}
+
+function buildAnimCSS() {
+  if (!anims.length) return '';
+  let css = '';
+  const byEl = {};
+  anims.forEach(a => {
+    const kf = 'kf_' + a.id;
+    if (a.type === 'translate') css += `@keyframes ${kf}{from{transform:translate(${a.c.fx}px,${a.c.fy}px)}to{transform:translate(${a.c.tx}px,${a.c.ty}px)}}\n`;
+    else if (a.type === 'rotate') css += `@keyframes ${kf}{from{transform:rotate(${a.c.f}deg)}to{transform:rotate(${a.c.t}deg)}}\n`;
+    else if (a.type === 'fade') css += `@keyframes ${kf}{from{opacity:${a.c.f}}to{opacity:${a.c.t}}}\n`;
+    else if (a.type === 'scale') css += `@keyframes ${kf}{from{transform:scale(${a.c.f})}to{transform:scale(${a.c.t})}}\n`;
+    else if (a.type === 'morph') css += `@keyframes ${kf}{from{d:path('${a.c.f}')}to{d:path('${a.c.t}')}}\n`;
+    if (!byEl[a.elId]) byEl[a.elId] = [];
+    const needsOrigin = a.type !== 'fade' && a.type !== 'morph';
+    byEl[a.elId].push({ anim: `${kf} ${a.dur}s ${a.eas} ${a.del}s ${a.rep} ${a.dir}`, needsOrigin });
+  });
+  Object.entries(byEl).forEach(([id, arr]) => {
+    const animStr = arr.map(x => x.anim).join(',');
+    const originCSS = arr.some(x => x.needsOrigin) ? 'transform-box:fill-box;transform-origin:center center;' : '';
+    css += `#${id}{animation:${animStr};${originCSS}}\n`;
+  });
+  return css;
+}
+
+function renderPreview() {
+  if (!svgDoc) return;
+
+  // injeta CSS no svgDoc
+  let styleEl = svgDoc.getElementById('_animator_css');
+  if (!styleEl) {
+    styleEl = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.id = '_animator_css';
+    svgDoc.documentElement.insertBefore(styleEl, svgDoc.documentElement.firstChild);
+  }
+  styleEl.textContent = buildAnimCSS();
+
+  // usa importNode para preservar namespaces sem prefixos estranhos
+  const container = $('preview-container');
+  const oldSvg = container.querySelector('svg');
+  if (oldSvg) oldSvg.remove();
+
+  const oldMsg = $('empty-msg');
+  if (oldMsg) oldMsg.remove();
+
+  const node = document.importNode(svgDoc.documentElement, true);
+  node.style.display = 'block';
+  node.style.maxWidth = '100%';
+  node.style.maxHeight = 'calc(100vh - 82px)';
+  node.style.width = 'auto';
+  node.style.height = 'auto';
+  container.appendChild(node);
+
+  // clique para selecionar
+  elements.forEach(({ id }) => {
+    const el = container.querySelector('#' + CSS.escape(id));
+    if (!el) return;
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', e => { e.stopPropagation(); selectEl(id); });
+  });
+
+  if (selId) applyHighlight(selId);
+}
+
+function applyHighlight(id) {
+  document.querySelectorAll('#preview-container .hl').forEach(el => {
+    el.classList.remove('hl');
+    el.setAttribute('stroke', el._os || '');
+    el.setAttribute('stroke-width', el._osw || '');
+  });
+  const el = document.querySelector('#preview-container #' + CSS.escape(id));
+  if (!el) return;
+  el._os = el.getAttribute('stroke') || '';
+  el._osw = el.getAttribute('stroke-width') || '';
+  el.setAttribute('stroke', '#1a56db');
+  el.setAttribute('stroke-width', '1.5');
+  el.classList.add('hl');
+}
+
+function renderElList() {
+  const list = $('el-list');
+  if (!elements.length) { list.innerHTML = '<div class="empty-hint">Nenhum elemento encontrado</div>'; return; }
+  list.innerHTML = elements.map(({ id, tag }) =>
+    `<div class="eli${id === selId ? ' active' : ''}" data-id="${id}">
+      <span class="etag">${tag}</span>
+      <span class="ename">${id}</span>
+    </div>`
+  ).join('');
+  list.querySelectorAll('.eli').forEach(item => item.addEventListener('click', () => selectEl(item.dataset.id)));
+}
+
+function selectEl(id) {
+  selId = id;
+  $('sel-label').textContent = id;
+  $('sel-label').style.color = '#222';
+  $('add-btn').disabled = false;
+  renderElList();
+  applyHighlight(id);
+  if ($('anim-type').value === 'morph' && svgDoc) {
+    const el = svgDoc.querySelector('#' + CSS.escape(id));
+    if (el && el.tagName.toLowerCase() === 'path') $('m-from').value = el.getAttribute('d') || '';
+  }
+}
+
+$('anim-type').addEventListener('change', function() {
+  document.querySelectorAll('.tpanel').forEach(p => p.style.display = 'none');
+  $('tp-' + this.value).style.display = 'block';
+  if (this.value === 'morph' && selId && svgDoc) {
+    const el = svgDoc.querySelector('#' + CSS.escape(selId));
+    if (el && el.tagName.toLowerCase() === 'path') $('m-from').value = el.getAttribute('d') || '';
+  }
+});
+$('tp-translate').style.display = 'block';
+
+$('add-btn').addEventListener('click', () => {
+  if (!selId) return;
+  const type = $('anim-type').value;
+  let c = {};
+  if (type === 'translate') c = { fx: +$('tx-fx').value||0, fy: +$('tx-fy').value||0, tx: +$('tx-tx').value||0, ty: +$('tx-ty').value||0 };
+  else if (type === 'rotate') c = { f: +$('rot-f').value||0, t: +$('rot-t').value||360 };
+  else if (type === 'fade') c = { f: +$('fd-f').value, t: +$('fd-t').value };
+  else if (type === 'scale') c = { f: +$('sc-f').value||1, t: +$('sc-t').value||1.2 };
+  else if (type === 'morph') {
+    c = { f: $('m-from').value.trim(), t: $('m-to').value.trim() };
+    if (!c.f || !c.t) { alert('Preenche os dois paths para morph'); return; }
+  }
+  anims.push({ id: 'a'+ac++, elId: selId, type, c, dur: +$('a-dur').value||1, del: +$('a-del').value||0, rep: $('a-rep').value, dir: $('a-dir').value, eas: $('a-eas').value });
+  renderAnimList();
+  renderPreview();
+});
+
+function renderAnimList() {
+  const wrap = $('anim-list');
+  if (!anims.length) { wrap.innerHTML = '<div class="empty-hint">Nenhuma ainda</div>'; return; }
+  const tl = { translate:'mover', rotate:'girar', fade:'fade', scale:'escala', morph:'morph' };
+  wrap.innerHTML = anims.map(a =>
+    `<div class="ai">
+      <div>
+        <div style="font-weight:500">${a.elId}</div>
+        <div class="ai-info">${tl[a.type]} · ${a.dur}s · ${a.rep}</div>
+      </div>
+      <button class="db" data-id="${a.id}">×</button>
+    </div>`
+  ).join('');
+  wrap.querySelectorAll('.db').forEach(btn => btn.addEventListener('click', () => {
+    anims = anims.filter(a => a.id !== btn.dataset.id);
+    renderAnimList(); renderPreview();
+  }));
+}
+
+$('exp-btn').addEventListener('click', () => {
+  if (!svgDoc) { alert('Importe um SVG primeiro'); return; }
+  let styleEl = svgDoc.getElementById('_animator_css');
+  if (!styleEl) {
+    styleEl = svgDoc.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.id = '_animator_css';
+    svgDoc.documentElement.insertBefore(styleEl, svgDoc.documentElement.firstChild);
+  }
+  styleEl.textContent = buildAnimCSS();
+  const s = new XMLSerializer().serializeToString(svgDoc);
+  const link = document.createElement('a');
+  link.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
+  link.download = 'animated.svg';
+  link.click();
+});
+</script>
+</body>
+</html>
